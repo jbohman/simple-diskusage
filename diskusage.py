@@ -18,7 +18,7 @@ def convert_bytes(in_bytes):
         return (in_bytes / 1024.0, 'KiB')
     return (in_bytes, 'bytes')
 
-def walk(directory):
+def walk_directory(directory):
     try:
         content = os.listdir(directory)
     except OSError:
@@ -31,7 +31,7 @@ def walk(directory):
             if stat.S_ISREG(item_stat.st_mode):
                 yield (item, item_stat)
             elif stat.S_ISDIR(item_stat.st_mode):
-                for x in walk(new_item):
+                for x in walk_directory(new_item):
                     yield x
                 yield (item, item_stat)
         except OSError:
@@ -52,8 +52,10 @@ if __name__ == '__main__':
         for item in os.listdir(root_directory):
             item_path = os.path.join(root_directory, item)
             item_stat = os.lstat(item_path) 
-            if stat.S_ISREG(item_stat.st_mode) or stat.S_ISDIR(item_stat.st_mode):
-                root_directories[item] = item_stat.st_size + sum(x[1].st_size for x in walk(item_path))
+            if stat.S_ISREG(item_stat.st_mode):
+                root_directories[item] = (item_stat.st_size, 'f')
+            elif stat.S_ISDIR(item_stat.st_mode):
+                root_directories[item] = (sum(x[1].st_size for x in walk_directory(item_path)), 'd')
 
     except OSError:
         sys.stderr.write('Could not read directory\n')
@@ -63,9 +65,10 @@ if __name__ == '__main__':
         sys.stderr.write('No files or directories in selected path\n')
         sys.exit(1)
 
-    print 'Total size for items in %s' % (root_directory,)
     name_count = max(len(x) for x in root_directories.iterkeys())
-    byte_count = max(len(str(int(convert_bytes(x)[0]))) for x in root_directories.itervalues())
+    byte_count = max(len(str(int(convert_bytes(x[0])[0]))) for x in root_directories.itervalues())
+
+    print 'Total size for items in %s' % (root_directory,)
     for item, size in sorted(root_directories.iteritems(), key=operator.itemgetter(1), reverse=True):
-        byte_tuple = convert_bytes(size)
-        print '%s: %s %s' % (item.ljust(name_count + 3), ('%.2f' % (byte_tuple[0],)).rjust(byte_count + 3), byte_tuple[1])
+        byte_tuple = convert_bytes(size[0])
+        print '%s %s %s %s' % (size[1], item.ljust(name_count + 3), ('%.2f' % (byte_tuple[0],)).rjust(byte_count + 3), byte_tuple[1].ljust(5))
